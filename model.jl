@@ -118,36 +118,36 @@ function transition_worst(next_tree, lbs, ubs, pra)
     return nodes, probs, worst_nodes, worst_probs
 end
 
-# function transition_range(next_tree, lbs, ubs, pra)
-#     worst_nodes = Vector{LEAFNODE}()
-#     worst_probs = Vector{Float64}()
+function transition_range(next_tree, lbs, ubs, pra)
+    worst_nodes = Vector{LEAFNODE}()
+    worst_probs = Vector{Float64}()
 
-#     max_range = 0.0
+    max_range = 0.0
 
-#     ownProbs, ownAccels = accels[pra]
+    ownProbs, ownAccels = accels[pra]
 
-#     for i = 1:length(ownAccels)
-#         next_lbs, next_ubs = dynamics(lbs, ubs, ownAccels[i], pra)
+    for i = 1:length(ownAccels)
+        next_lbs, next_ubs = dynamics(lbs, ubs, ownAccels[i], pra)
 
-#         overlapping_nodes = get_overlapping_nodes(next_tree, next_lbs, next_ubs)
-#         vals = [maximum(nodes[i].qvals) for i = 1:length(nodes)]
+        overlapping_nodes = get_overlapping_nodes(next_tree, next_lbs, next_ubs)
+        vals = [maximum(overlapping_nodes[i].qvals) for i = 1:length(overlapping_nodes)]
 
-#         worst_node = overlapping_nodes[1]
-#         worst_val = maximum(overlapping_nodes[1].qvals)
-#         for j = 2:length(overlapping_nodes)
-#             val = maximum(overlapping_nodes[j].qvals)
-#             if val > worst_val
-#                 worst_node = overlapping_nodes[j]
-#                 worst_val = val
-#             end
-#         end
-#         push!(worst_nodes, worst_node)
-#         push!(worst_probs, ownProbs[i])
+        worst_node = overlapping_nodes[1]
+        worst_val = maximum(overlapping_nodes[1].qvals)
+        for j = 2:length(overlapping_nodes)
+            if vals[j] > worst_val
+                worst_node = overlapping_nodes[j]
+                worst_val = vals[j]
+            end
+        end
+        push!(worst_nodes, worst_node)
+        push!(worst_probs, ownProbs[i])
 
-#         range = maximum
-#     end
-#     return nodes, probs, worst_nodes, worst_probs    
-# end
+        range = maximum(vals) - minimum(vals)
+        max_range = range > max_range ? range : max_range
+    end
+    return max_range, worst_nodes, worst_probs    
+end
 
 # Bounds should be normalized
 function dynamics(lbs, ubs, ḧ₀, a)

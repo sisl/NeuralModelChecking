@@ -8,12 +8,14 @@ function check_and_split(kdtrees; qthreshold = 0.5, threshold = 0.9, both = fals
     end
     # for the rest of the taus
     for τ = 1:40
+        start = time()
         println("τ: $τ")
         # do update for each pra
         for pra in actions
             tree = kdtrees[(pra, τ)]
             update_or_split(tree, kdtrees, pra, τ, qthreshold = qthreshold, threshold = threshold, both = both)
         end
+        println("Time: $(time() - start)")
     end
 end
 
@@ -72,10 +74,12 @@ function update_leaf!(tree, side, kdtrees, pra, τ, lbs, ubs; qthreshold = 0.5, 
     # Figure out if need to split
     for i = 1:length(leaf.cats)
         next_tree = kdtrees[(leaf.cats[i], τ - 1)]
-        nodes, probs, worst_nodes, worst_probs = transition_worst(next_tree, lbs, ubs, pra)
-        next_vals = [maximum(nodes[i].qvals) for i = 1:length(nodes)]
-        diff = maximum(next_vals) - minimum(next_vals)
-        should_split = (diff > threshold) && (ubs[1] - lbs[1] > 10 / 16000)
+        # nodes, probs, worst_nodes, worst_probs = transition_worst(next_tree, lbs, ubs, pra)
+        # next_vals = [maximum(nodes[i].qvals) for i = 1:length(nodes)]
+        # diff = maximum(next_vals) - minimum(next_vals)
+        # should_split = (diff > threshold) && (ubs[1] - lbs[1] > 10 / 16000)
+        max_range, worst_nodes, worst_probs=  transition_range(next_tree, lbs, ubs, pra)
+        should_split = (max_range > threshold) && (ubs[1] - lbs[1] > 10 / 16000)
         if should_split
             both ? split_both!(tree, lbs, ubs, side, prefix = prefix) : 
                    split!(tree, lbs, ubs, pra, τ, 1, side, prefix = prefix)
