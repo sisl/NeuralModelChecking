@@ -10,6 +10,43 @@ ḣ₀s = vcat(LinRange(-100,-60,5),
            LinRange(35,50,4),
            LinRange(60,100,5))
 
+"""
+Tree Arrays
+"""
+function plot_nadvs(ta::TREEARRAY)
+    lbs_u, ubs_u, cats = get_bounds_and_cats(ta)
+
+    # Unnormalize everying
+    lbs = [unnormalize_point(lbs_u[i]) for i = 1:length(lbs_u)]
+    ubs = [unnormalize_point(ubs_u[i]) for i = 1:length(ubs_u)]
+
+    ymin = -8000
+    ymax = 8000
+    xmin = -100
+    xmax = 100
+
+    ax = Axis(xmin=xmin, xmax=xmax, ymin=ymin, ymax=ymax, width="10cm", height="10cm", 
+    xlabel=L"$h$", ylabel=L"$\dot{h}_0$", title="Number of Possible Advisories")
+
+    for i = 1:length(lbs)
+        if length(cats[i]) == 1
+            color = "blue"
+        elseif length(cats[i]) == 2
+            color = "red"
+        else
+            color = "yellow"
+        end
+        push!(ax, Plots.Command(get_filled_rectangle([lbs[i][2], lbs[i][1]],
+                                                     [ubs[i][2], ubs[i][1]], color)))
+    end
+
+    return ax
+end
+
+"""
+Kdtrees
+"""
+
 function viz_probability(kdtrees)
     currSavePlot = 0
     first_call = true

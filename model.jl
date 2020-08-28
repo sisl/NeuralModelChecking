@@ -149,6 +149,29 @@ function transition_range(next_tree, lbs, ubs, pra)
     return max_range, worst_nodes, worst_probs    
 end
 
+function transition_ta(ta::TREEARRAY, lbs, ubs, pra)
+    worst_vals = Vector{Float64}()
+    worst_probs = Vector{Float64}()
+
+    max_range = 0.0
+
+    ownProbs, ownAccels = accels[pra]
+
+    for i = 1:length(ownAccels)
+        next_lbs, next_ubs = dynamics(lbs, ubs, ownAccels[i], pra)
+
+        overlapping_data_inds = get_overlapping_nodes(ta, next_lbs, next_ubs)
+        vals = [maximum(ta.qvals[:, overlapping_data_inds[i]]) for i = 1:length(overlapping_data_inds)]
+
+        push!(worst_vals, maximum(vals))
+        push!(worst_probs, ownProbs[i])
+
+        range = maximum(vals) - minimum(vals)
+        max_range = range > max_range ? range : max_range
+    end
+    return max_range, worst_vals, worst_probs 
+end
+
 # Bounds should be normalized
 function dynamics(lbs, ubs, ḧ₀, a)
     true_lbs = unnormalize_point(lbs)

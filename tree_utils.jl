@@ -1,4 +1,328 @@
 using DataStructures
+using Mmap
+
+"""
+Array Trees
+
+Interior nodes:
+nodes (Int64): left index (right index is left index + 1 always!)
+dims (BitArray): one hot encoding of dimension
+splits (Float64): split values
+
+Leaf nodes:
+nodes (Int64): -leaf_data index (know it is leaf node if this is a negative value)
+dims (BitArray): N/A will just keep as garbage value or zero
+splits (Float64): N/A will just keep as garbage value or zero
+leaf_data (BitArray): one hot encoding of possible advisories
+"""
+mutable struct TREEARRAY
+    nodes::Vector{Int32}
+    splits::Vector{Float64}
+    dims::BitArray
+    leaf_data::BitArray
+    qvals::Array{Float64, 2}
+    node_index::Int32
+    leaf_index::Int32
+end
+
+# CREATION AND MEMORY MANAGEMENT
+
+function treearray(nodes::Vector{Int32},
+                   splits::Vector{Float64},
+                   dims::BitArray,
+                   leaf_data::BitArray,
+                   node_index::Int32,
+                   leaf_index::Int32)    
+    return TREEARRAY(nodes, splits, dims, leaf_data, 
+                     Array{Float64, 2}(undef, 1, 1), node_index, leaf_index)
+end
+
+function treearray(totsize, prefix)
+    n = open("$(prefix)_n.bin", "w+")
+    write(n, totsize)
+    nodes = Mmap.mmap(n, Vector{Int32}, totsize)
+
+    s = open("$(prefix)_s.bin", "w+")
+    write(s, totsize)
+    splits = Mmap.mmap(s, Vector{Float64}, totsize)
+
+    d = open("$(prefix)_d.bin", "w+")
+    write(d, 2)
+    write(d, totsize)
+    dims = Mmap.mmap(d, BitArray, (2, totsize))
+
+    l = open("$(prefix)_l.bin", "w+")
+    write(l, 9)
+    write(l, totsize)
+    leaf_data = Mmap.mmap(l, BitArray, (9, totsize))
+
+    q = open("$(prefix)_q.bin", "w+")
+    write(q, 9)
+    write(q, totsize)
+    qvals = Mmap.mmap(q, Array{Float64, 2}, (9, totsize))
+
+    return TREEARRAY(nodes, splits, dims, leaf_data, 
+                     qvals, 1, 1)
+end
+
+function treearray_copy(ta::TREEARRAY, prefix)
+    write_to_files(ta, prefix)
+    return mmap_trees_modify(prefix)
+end
+
+function treearray_copy_and_extend(ta::TREEARRAY, totsize, prefix)
+    updated_ta = treearray(totsize, prefix)
+
+    node_index = length(ta.nodes)
+    leaf_index = size(ta.leaf_data, 2)
+
+    updated_ta.nodes[1:node_index] = ta.nodes
+    updated_ta.splits[1:node_index] = ta.splits
+    updated_ta.dims[:, 1:node_index] = ta.dims
+    updated_ta.leaf_data[:, 1:leaf_index] = ta.leaf_data
+
+    updated_ta.node_index = convert(Int32, node_index + 1)
+    updated_ta.leaf_index = convert(Int32, leaf_index + 1)
+
+    sync_treearray(updated_ta)
+
+    return updated_ta
+end
+
+function sync_treearray(ta::TREEARRAY)
+    Mmap.sync!(ta.nodes)
+    Mmap.sync!(ta.splits)
+    Mmap.sync!(ta.dims)
+    Mmap.sync!(ta.leaf_data)
+    Mmap.sync!(ta.qvals)
+end
+
+function mmap_trees(filepath)
+    tas = Dict()
+    for pra in 1:9
+        for τ = 0.0:40.0
+            τint = convert(Int64, τ)
+            prefix = "$(filepath)pra$(pra)tau$(τint)"
+            tas[(pra - 1, τ)] = mmap_tree(prefix)
+        end
+    end
+    return tas
+end
+
+function mmap_tree(prefix)
+    # Nodes file
+    n = open("$(prefix)_n.bin")
+    a = read(n, Int)
+    node_index = convert(Int32, a + 1)
+    nodes = Mmap.mmap(n, Vector{Int32}, a)
+
+    # Splits file
+    s = open("$(prefix)_s.bin")
+    a = read(s, Int)
+    splits = Mmap.mmap(s, Vector{Float64}, a)
+
+    # Dims file
+    d = open("$(prefix)_d.bin")
+    a = read(d, Int)
+    b = read(d, Int)
+    dims = Mmap.mmap(d, BitArray, (a,b))
+
+    # Leaf_data file
+    l = open("$(prefix)_l.bin")
+    a = read(l, Int)
+    b = read(l, Int)
+    leaf_index = convert(Int32, b + 1)
+    leaf_data = Mmap.mmap(l, BitArray, (a,b))
+
+    if isfile("$(prefix)_q.bin")
+        # Qvals file
+        q = open("$(prefix)_q.bin")
+        a = read(q, Int)
+        b = read(q, Int)
+        qvals = Mmap.mmap(q, Matrix{Float64}, (a,b))
+        return TREEARRAY(nodes, splits, dims, leaf_data, qvals, node_index, leaf_index)
+    end
+
+    return treearray(nodes, splits, dims, leaf_data, node_index, leaf_index)
+end
+
+function mmap_trees_modify(prefix)
+    # Nodes file
+    n = open("$(prefix)_n.bin", "r+")
+    a = read(n, Int)
+    node_index = convert(Int32, a + 1)
+    nodes = Mmap.mmap(n, Vector{Int32}, a)
+
+    # Splits file
+    s = open("$(prefix)_s.bin", "r+")
+    a = read(s, Int)
+    splits = Mmap.mmap(s, Vector{Float64}, a)
+
+    # Dims file
+    d = open("$(prefix)_d.bin", "r+")
+    a = read(d, Int)
+    b = read(d, Int)
+    dims = Mmap.mmap(d, BitArray, (a,b))
+
+    # Leaf_data file
+    l = open("$(prefix)_l.bin", "r+")
+    a = read(l, Int)
+    b = read(l, Int)
+    leaf_index = convert(Int32, b + 1)
+    leaf_data = Mmap.mmap(l, BitArray, (a,b))
+
+    if isfile("$(prefix)_q.bin")
+        # Qvals file
+        q = open("$(prefix)_q.bin", "r+")
+        a = read(q, Int)
+        b = read(q, Int)
+        qvals = Mmap.mmap(q, Matrix{Float64}, (a,b))
+        return TREEARRAY(nodes, splits, dims, leaf_data, qvals, node_index, leaf_index)
+    end
+
+    return treearray(nodes, splits, dims, leaf_data, node_index, leaf_index)
+end
+
+function write_to_files(ta::TREEARRAY, prefix)
+    # Nodes file
+    n = open("$(prefix)_n.bin", "w+")
+    write(n, length(ta.nodes))
+    write(n, ta.nodes)
+    close(n)
+
+    # Splits file
+    s = open("$(prefix)_s.bin", "w+")
+    write(s, length(ta.splits))
+    write(s, ta.splits)
+    close(s)
+
+    # Dims file
+    d = open("$(prefix)_d.bin", "w+")
+    write(d, size(ta.dims,1))
+    write(d, size(ta.dims,2))
+    write(d, ta.dims)
+    close(d)
+
+    # Leaf_data file
+    l = open("$(prefix)_l.bin", "w+")
+    write(l, size(ta.leaf_data,1))
+    write(l, size(ta.leaf_data,2))
+    write(l, ta.leaf_data)
+    close(l)
+
+    # Qvals file
+    q = open("$(prefix)_q.bin", "w+")
+    write(q, size(ta.leaf_data,1))
+    write(q, size(ta.leaf_data,2))
+    write(q, zeros(Float64, size(ta.leaf_data,1), size(ta.leaf_data,2)))
+    close(q)
+end
+
+
+# TRAVERSAL AND EVALUATION
+
+function get_bounds_and_cats(ta::TREEARRAY)
+    nodes = ta.nodes
+    splits = ta.splits
+    dims = ta.dims
+    leaf_data = ta.leaf_data
+    
+    cats = []
+    lbs = []
+    ubs = []
+    
+    lb_s = Stack{Vector{Float64}}()
+    ub_s = Stack{Vector{Float64}}()
+    s = Stack{Int32}()
+
+    push!(lb_s, [-0.5, -0.5])
+    push!(ub_s, [0.5, 0.5])
+    push!(s, 1)
+
+    while !isempty(s)
+        curr = pop!(s)
+        curr_lbs = pop!(lb_s)
+        curr_ubs = pop!(ub_s)
+
+        if nodes[curr] < 0 # leaf node
+            one_hot = leaf_data[:, -nodes[curr]]
+            push!(cats, findall(one_hot))
+            push!(lbs, curr_lbs)
+            push!(ubs, curr_ubs)
+        else # interior node
+            # Traverse tree and keep track of bounds
+            dim = findall(dims[:, curr])[1]
+            split = splits[curr]
+            # Go left, upper bounds will change
+            left_ubs = copy(curr_ubs)
+            left_ubs[dim] = split
+
+            push!(lb_s, curr_lbs)
+            push!(ub_s, left_ubs)
+            push!(s, nodes[curr])
+
+            # Go right, lower bounds will change
+            right_lbs = copy(curr_lbs)
+            right_lbs[dim] = split
+            
+            push!(lb_s, right_lbs)
+            push!(ub_s, curr_ubs)
+            push!(s, nodes[curr] + 1)
+        end
+    end
+
+    return lbs, ubs, cats
+end
+
+# Will return positive indices of the corresponding leaf data
+function get_overlapping_nodes(ta::TREEARRAY, lbs, ubs)
+    nodes = ta.nodes
+    splits = ta.splits
+    dims = ta.dims
+    leaf_data = ta.leaf_data
+    
+    overlapping_node_data_inds = []
+    
+    s = Stack{Int32}()
+
+    push!(s, 1)
+
+    while !isempty(s)
+        curr = pop!(s)
+
+        if nodes[curr] < 0 # leaf node
+            push!(overlapping_node_data_inds, -nodes[curr])
+        else # interior node
+            # Check if can prune either side
+            dim = findfirst(dims[:, curr])
+            split = splits[curr]
+            if split > ubs[dim]
+                # Can prune the right half
+                push!(s, nodes[curr])
+            elseif split < lbs[dim]
+                # Can prune the left half
+                push!(s, nodes[curr] + 1)
+            else
+                push!(s, nodes[curr])
+                push!(s, nodes[curr] + 1)
+            end
+        end
+    end
+
+    return overlapping_node_data_inds
+end
+
+function get_qvals(ta::TREEARRAY, point)
+    curr = 1 # root of tree
+    while ta.nodes[curr] > 0 # not at leaf
+        split = ta.splits[curr]
+        dim = findfirst(ta.dims[:, curr])
+
+        # Go left or right
+        curr = point[dim] < split ? ta.nodes[curr] : ta.nodes[curr] + 1
+    end
+    return ta.qvals[:, -ta.nodes[curr]]
+end
 
 """
 KDTrees
