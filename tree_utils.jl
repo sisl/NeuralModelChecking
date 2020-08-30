@@ -37,42 +37,23 @@ function treearray(nodes::Vector{Int32},
                      Array{Float64, 2}(undef, 1, 1), node_index, leaf_index)
 end
 
-function treearray(totsize, prefix)
-    n = open("$(prefix)_n.bin", "w+")
-    write(n, totsize)
-    nodes = Mmap.mmap(n, Vector{Int32}, totsize)
-
-    s = open("$(prefix)_s.bin", "w+")
-    write(s, totsize)
-    splits = Mmap.mmap(s, Vector{Float64}, totsize)
-
-    d = open("$(prefix)_d.bin", "w+")
-    write(d, 2)
-    write(d, totsize)
-    dims = Mmap.mmap(d, BitArray, (2, totsize))
-
-    l = open("$(prefix)_l.bin", "w+")
-    write(l, 9)
-    write(l, totsize)
-    leaf_data = Mmap.mmap(l, BitArray, (9, totsize))
-
-    q = open("$(prefix)_q.bin", "w+")
-    write(q, 9)
-    write(q, totsize)
-    qvals = Mmap.mmap(q, Array{Float64, 2}, (9, totsize))
-
-    return TREEARRAY(nodes, splits, dims, leaf_data, 
-                     qvals, 1, 1)
+function treearray(totsize::Int64)
+    return TREEARRAY(zeros(Int32, totsize), zeros(Float64, totsize),
+                           falses(2, totsize), falses(9, totsize), zeros(Float64, 9, totsize),
+                           1, 1)
 end
 
-function treearray_copy(ta::TREEARRAY, prefix)
-    write_to_files(ta, prefix)
-    return mmap_trees_modify(prefix)
+function treearray_copy(ta::TREEARRAY)
+    return TREEARRAY(copy(ta.nodes), copy(ta.splits), copy(ta.dims), copy(ta.leaf_data),
+                zeros(9, size(ta.leaf_data, 2)), ta.node_index, ta.leaf_index)
 end
 
-function treearray_copy_and_extend(ta::TREEARRAY, totsize, prefix)
-    updated_ta = treearray(totsize, prefix)
+function treearray_copy_and_extend(ta::TREEARRAY, totsize)
+    updated_ta = TREEARRAY(zeros(Int32, totsize), zeros(Float64, totsize),
+                           falses(2, totsize), falses(9, totsize), zeros(Float64, 9, totsize),
+                           length(ta.nodes) + 1, size(ta.leaf_data, 2) + 1)
 
+    # Fill in the data
     node_index = length(ta.nodes)
     leaf_index = size(ta.leaf_data, 2)
 
@@ -80,11 +61,6 @@ function treearray_copy_and_extend(ta::TREEARRAY, totsize, prefix)
     updated_ta.splits[1:node_index] = ta.splits
     updated_ta.dims[:, 1:node_index] = ta.dims
     updated_ta.leaf_data[:, 1:leaf_index] = ta.leaf_data
-
-    updated_ta.node_index = convert(Int32, node_index + 1)
-    updated_ta.leaf_index = convert(Int32, leaf_index + 1)
-
-    sync_treearray(updated_ta)
 
     return updated_ta
 end
@@ -146,7 +122,7 @@ function mmap_tree(prefix)
     return treearray(nodes, splits, dims, leaf_data, node_index, leaf_index)
 end
 
-function mmap_trees_modify(prefix)
+function mmap_tree_modify(prefix)
     # Nodes file
     n = open("$(prefix)_n.bin", "r+")
     a = read(n, Int)
@@ -212,9 +188,47 @@ function write_to_files(ta::TREEARRAY, prefix)
 
     # Qvals file
     q = open("$(prefix)_q.bin", "w+")
-    write(q, size(ta.leaf_data,1))
-    write(q, size(ta.leaf_data,2))
-    write(q, zeros(Float64, size(ta.leaf_data,1), size(ta.leaf_data,2)))
+    write(q, size(ta.qvals,1))
+    write(q, size(ta.qvals,2))
+    write(q, ta.qvals)
+    close(q)
+end
+
+function write_to_files_and_truncate(ta::TREEARRAY, prefix)
+    node_end = ta.node_index - 1
+    leaf_end = ta.leaf_index - 1
+    
+    # Nodes file
+    n = open("$(prefix)_n.bin", "w+")
+    write(n, node_end)
+    write(n, ta.nodes[1:node_end])
+    close(n)
+
+    # Splits file
+    s = open("$(prefix)_s.bin", "w+")
+    write(s, node_end)
+    write(s, ta.splits[1:node_end])
+    close(s)
+
+    # Dims file
+    d = open("$(prefix)_d.bin", "w+")
+    write(d, size(ta.dims,1))
+    write(d, node_end)
+    write(d, ta.dims[:,1:node_end])
+    close(d)
+
+    # Leaf_data file
+    l = open("$(prefix)_l.bin", "w+")
+    write(l, size(ta.leaf_data,1))
+    write(l, leaf_end)
+    write(l, ta.leaf_data[:,1:leaf_end])
+    close(l)
+
+    # Qvals file
+    q = open("$(prefix)_q.bin", "w+")
+    write(q, size(ta.qvals,1))
+    write(q, leaf_end)
+    write(q, ta.qvals[:,1:leaf_end])
     close(q)
 end
 
