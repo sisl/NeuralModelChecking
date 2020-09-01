@@ -88,7 +88,8 @@ function label_collisions(ta::TREEARRAY, post_prefix)
 end
 
 function update(ta::TREEARRAY, updated_tas, pra, τ, post_prefix)   
-    updated_ta = treearray_copy_and_extend(ta, 40000)
+    updated_ta = treearray_copy_and_map(ta, 40000, post_prefix)
+    #updated_ta = treearray_copy_and_extend(ta, 40000)
     
     nodes = updated_ta.nodes
     splits = updated_ta.splits
@@ -146,9 +147,11 @@ function update(ta::TREEARRAY, updated_tas, pra, τ, post_prefix)
     end
 
     # Write the final tree array to a file and memory map it
-    write_to_files_and_truncate(updated_ta, post_prefix)
-    mapped_updated_ta = mmap_tree(post_prefix)
-    return mapped_updated_ta
+    # write_to_files_and_truncate(temp_ta, post_prefix)
+    # mapped_updated_ta = mmap_tree(post_prefix)
+    # return mapped_updated_ta
+    sync_treearray(updated_ta)
+    return updated_ta
 end
 
 """
@@ -167,7 +170,7 @@ function check_and_split_tas(tas; qthreshold = 0.5, threshold = 0.9,
         updated_tas[(pra, 0.0)] = label_collisions(ta, post_prefix)
     end
     # for the rest of the taus
-    for τ = 1:2
+    for τ = 1:40
         start = time()
         println("τ: $τ")
         τint = convert(Int64, τ)
@@ -183,7 +186,9 @@ function check_and_split_tas(tas; qthreshold = 0.5, threshold = 0.9,
 end
 
 function update_or_split(ta::TREEARRAY, updated_tas, pra, τ, post_prefix, qthreshold, threshold, prefix)
-    updated_ta = treearray_copy_and_extend(ta, 80000)
+    updated_ta = treearray_copy_and_map(ta, 400000, post_prefix)
+    #updated_ta = treearray_copy_and_extend(ta, 80000)
+    #copy_over!(ta, temp_ta)
     
     cats = []
     lbs = []
@@ -229,12 +234,14 @@ function update_or_split(ta::TREEARRAY, updated_tas, pra, τ, post_prefix, qthre
     end
 
     # Write the final tree array to a file and memory map it
-    write_to_files_and_truncate(updated_ta, post_prefix)
-    mapped_updated_ta = mmap_tree(post_prefix)
-    return mapped_updated_ta
+    # write_to_files_and_truncate(temp_ta, post_prefix)
+    # mapped_updated_ta = mmap_tree(post_prefix)
+    # return mapped_updated_ta
+    sync_treearray(updated_ta)
+    return updated_ta
 end
 
-function update_leaf!(ta::TREEARRAY, updated_tas, pra, τ, curr, curr_lbs, curr_ubs, s, lb_s, ub_s; qthreshold = 0.5, threshold = 0.9,
+function update_leaf!(ta::Union{TREEARRAY, SHARED_TREEARRAY}, updated_tas, pra, τ, curr, curr_lbs, curr_ubs, s, lb_s, ub_s; qthreshold = 0.5, threshold = 0.9,
     prefix = "/scratch/smkatz/VerticalCAS/networks/bugfix_pra0")
     
     nodes = ta.nodes
@@ -285,9 +292,10 @@ function update_leaf!(ta::TREEARRAY, updated_tas, pra, τ, curr, curr_lbs, curr_
             end
         end
     end
+    #sync_treearray(ta)
 end
 
-function split_and_reverify!(ta::TREEARRAY, curr, lbs, ubs, s, lb_s, ub_s, pra, τ, dim;
+function split_and_reverify!(ta::Union{TREEARRAY, SHARED_TREEARRAY}, curr, lbs, ubs, s, lb_s, ub_s, pra, τ, dim;
     prefix = "/scratch/smkatz/VerticalCAS/networks/bugfix_pra0")
     
     cats = findall(ta.leaf_data[:, -ta.nodes[curr]]) .- 1 # subtract 1 because index at 1

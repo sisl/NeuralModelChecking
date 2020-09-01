@@ -149,7 +149,7 @@ function transition_range(next_tree, lbs, ubs, pra)
     return max_range, worst_nodes, worst_probs    
 end
 
-function transition_ta(ta::TREEARRAY, lbs, ubs, pra)
+function transition_ta(ta::Union{TREEARRAY, SHARED_TREEARRAY}, lbs, ubs, pra)
     worst_vals = Vector{Float64}()
     worst_probs = Vector{Float64}()
 

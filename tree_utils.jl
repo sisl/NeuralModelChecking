@@ -1,5 +1,6 @@
 using DataStructures
 using Mmap
+using SharedArrays
 
 """
 Array Trees
@@ -25,7 +26,153 @@ mutable struct TREEARRAY
     leaf_index::Int32
 end
 
+mutable struct SHARED_TREEARRAY
+    nodes::SharedArray{Int32, 1}
+    splits::SharedArray{Float64, 1}
+    dims::SharedArray{Bool, 2}
+    leaf_data::SharedArray{Bool, 2}
+    qvals::SharedArray{Float64, 2}
+    node_index::Int32
+    leaf_index::Int32
+end
+
 # CREATION AND MEMORY MANAGEMENT
+
+# SHARED ARRAYS
+
+function create_files_for_sa(old_prefix, new_prefix)
+    n = open("$(old_prefix)_n.bin")
+    a = read(n, Int)
+    node_index = convert(Int32, a + 1)
+    nodes = Mmap.mmap(n, Vector{Int32}, a)
+    close(n)
+
+    n_new = open("$(new_prefix)_n.bin", "w+")
+    write(n_new, nodes)
+
+    close(n)
+    close(n_new)
+
+    # Splits file
+    s = open("$(old_prefix)_s.bin")
+    a = read(s, Int)
+    splits = Mmap.mmap(s, Vector{Float64}, a)
+
+    s_new = open("$(new_prefix)_s.bin", "w+")
+    write(s_new, splits)
+
+    close(s)
+    close(s_new)
+
+    # Dims file
+    d = open("$(old_prefix)_d.bin")
+    a = read(d, Int)
+    b = read(d, Int)
+    dims = Mmap.mmap(d, BitArray, (a,b))
+    dims_bool = convert(Array{Bool}, copy(dims))
+
+    d_new = open("$(new_prefix)_d.bin", "w+")
+    write(d_new, dims_bool)
+
+    close(d)
+    close(d_new)
+
+    # Leaf_data file
+    l = open("$(old_prefix)_l.bin")
+    a = read(l, Int)
+    b = read(l, Int)
+    leaf_index = convert(Int32, b + 1)
+    leaf_data = Mmap.mmap(l, BitArray, (a,b))
+    leaf_data_bool = convert(Array{Bool}, copy(leaf_data))
+
+    l_new = open("$(new_prefix)_l.bin", "w+")
+    write(l_new, leaf_data_bool)
+
+    close(l)
+    close(l_new)
+
+    i = open("$(new_prefix)_i.bin", "w+")
+    write(i, node_index - 1)
+    write(i, leaf_index - 1)
+
+    close(i)
+end
+
+function shared_treearray(prefix)
+    # Get the dimensions
+    i = open("$(prefix)_i.bin")
+    a = read(i, Int)
+    b = read(i, Int)
+    close(i)
+
+    # Read everything into shared arrays
+    nodes = SharedArray{Int32, 1}("$(prefix)_n.bin", (a,))
+    splits = SharedArray{Float64, 1}("$(prefix)_s.bin", (a,))
+    dims = SharedArray{Bool, 2}("$(prefix)_d.bin", (2, a))
+    leaf_data = SharedArray{Bool, 2}("$(prefix)_l.bin", (9, b))
+    if isfile("$(prefix)_q.bin")
+        qvals = SharedArray{Float64, 2}("$(prefix)_q.bin", (9, b))
+    else
+        qvals = SharedArray{Float64, 2}((1,1))
+    end
+
+    node_index = convert(Int32, a + 1)
+    leaf_index = convert(Int32, b + 1)
+
+    return SHARED_TREEARRAY(nodes, splits, dims, leaf_data, qvals, node_index, leaf_index)
+end
+
+function shared_treearrays(filepath)
+    stas = Dict()
+    for pra in 1:9
+        for τ = 0.0:40.0
+            τint = convert(Int64, τ)
+            prefix = "$(filepath)pra$(pra)tau$(τint)"
+            stas[(pra - 1, τ)] = shared_treearray(prefix)
+        end
+    end
+    return stas
+end
+
+# CAREFUL, ONLY LOAD A PREFIX YOU ARE COOL WITH MODIFYING THE FILES IN
+function shared_treearray_copy(sta::SHARED_TREEARRAY, post_prefix)
+    a = sta.node_index - 1
+    b = sta.leaf_index - 1
+
+    nodes = SharedArray{Int32, 1}("$(post_prefix)_n.bin", (a,), mode="w+")
+    nodes[:] = sta.nodes
+    splits = SharedArray{Float64, 1}("$(post_prefix)_s.bin", (a,), mode="w+")
+    splits[:] = sta.splits
+    dims = SharedArray{Bool, 2}("$(post_prefix)_d.bin", (2, a), mode="w+")
+    dims[:,:] = sta.dims
+    leaf_data = SharedArray{Bool, 2}("$(post_prefix)_l.bin", (9, b), mode="w+")
+    leaf_data[:,:] = sta.leaf_data
+    qvals = SharedArray{Float64, 2}("$(post_prefix)_q.bin", (9, b), mode="w+")
+    qvals[:,:] = zeros(9,b)
+
+    return SHARED_TREEARRAY(nodes, splits, dims, leaf_data, qvals, sta.node_index, sta.leaf_index)
+end
+
+# CAREFUL, ONLY LOAD A PREFIX YOU ARE COOL WITH MODIFYING THE FILES IN
+function shared_treearray_copy_and_extend(sta::SHARED_TREEARRAY, totsize, post_prefix)
+    a = sta.node_index - 1
+    b = sta.leaf_index - 1
+
+    nodes = SharedArray{Int32, 1}("$(post_prefix)_n.bin", (totsize,), mode="w+")
+    nodes[1:a] = sta.nodes
+    splits = SharedArray{Float64, 1}("$(post_prefix)_s.bin", (totsize,), mode="w+")
+    splits[1:a] = sta.splits
+    dims = SharedArray{Bool, 2}("$(post_prefix)_d.bin", (2, totsize), mode="w+")
+    dims[:,1:a] = sta.dims
+    leaf_data = SharedArray{Bool, 2}("$(post_prefix)_l.bin", (9, totsize), mode="w+")
+    leaf_data[:,1:b] = sta.leaf_data
+    qvals = SharedArray{Float64, 2}("$(post_prefix)_q.bin", (9, totsize), mode="w+")
+    qvals[:,:] = zeros(9,totsize)
+
+    return SHARED_TREEARRAY(nodes, splits, dims, leaf_data, qvals, sta.node_index, sta.leaf_index)
+end
+
+# MMAP
 
 function treearray(nodes::Vector{Int32},
                    splits::Vector{Float64},
@@ -41,6 +188,82 @@ function treearray(totsize::Int64)
     return TREEARRAY(zeros(Int32, totsize), zeros(Float64, totsize),
                            falses(2, totsize), falses(9, totsize), zeros(Float64, 9, totsize),
                            1, 1)
+end
+
+function mmapped_treearray(totsize::Int64, prefix)
+    # Nodes file
+    n = open("$(prefix)_n.bin", "w+")
+    write(n, totsize)
+    nodes = Mmap.mmap(n, Vector{Int32}, totsize, shared = true)
+    close(n)
+
+    # Splits file
+    s = open("$(prefix)_s.bin", "w+")
+    write(s, totsize)
+    splits = Mmap.mmap(s, Vector{Int32}, totsize, shared = true)
+    close(s)
+
+    # Dims file
+    d = open("$(prefix)_d.bin", "w+")
+    write(d, 2)
+    write(d, totsize)
+    dims = Mmap.mmap(d, BitArray, (2, totsize), shared = true)
+    close(d)
+
+    # Leaf_data file
+    l = open("$(prefix)_l.bin", "w+")
+    write(l, 9)
+    write(l, totsize)
+    leaf_data = Mmap.mmap(l, BitArray, (9, totsize), shared = true)
+    close(l)
+
+    # Qvals file
+    q = open("$(prefix)_q.bin", "w+")
+    write(q, 9)
+    write(q, totsize)
+    qvals = Mmap.mmap(q, Array{Float64,2}, (9, totsize), shared = true)
+    close(q)
+
+    return mmap_tree_modify(prefix)
+end
+
+function copy_over!(from::TREEARRAY, to::TREEARRAY)
+    node_index = length(from.nodes)
+    leaf_index = size(from.leaf_data, 2)
+
+    to.nodes = zeros(Int32, length(to.nodes))
+    to.nodes[1:node_index] = from.nodes
+
+    to.splits = zeros(Float64, length(to.splits))
+    to.splits[1:node_index] = from.splits
+
+    to.dims = falses(size(to.dims,1), size(to.dims,2))
+    to.dims[:, 1:node_index] = from.dims
+
+    to.leaf_data = falses(size(to.leaf_data,1), size(to.leaf_data,2))
+    to.leaf_data[:, 1:leaf_index] = from.leaf_data
+
+    to.node_index = length(from.nodes) + 1
+    to.leaf_index = size(from.leaf_data, 2) + 1
+end
+
+function treearray_copy_and_map(ta::TREEARRAY, totsize, prefix)
+    updated_ta = mmapped_treearray(totsize, prefix)
+
+    # Fill in the data
+    node_index = length(ta.nodes)
+    leaf_index = size(ta.leaf_data, 2)
+
+    updated_ta.nodes[1:node_index] = ta.nodes
+    updated_ta.splits[1:node_index] = ta.splits
+    updated_ta.dims[:, 1:node_index] = ta.dims
+    updated_ta.leaf_data[:, 1:leaf_index] = ta.leaf_data
+
+    updated_ta.node_index = node_index + 1
+    updated_ta.leaf_index = leaf_index + 1
+
+    sync_treearray(updated_ta)
+    return updated_ta
 end
 
 function treearray_copy(ta::TREEARRAY)
@@ -90,32 +313,32 @@ function mmap_tree(prefix)
     n = open("$(prefix)_n.bin")
     a = read(n, Int)
     node_index = convert(Int32, a + 1)
-    nodes = Mmap.mmap(n, Vector{Int32}, a)
+    nodes = Mmap.mmap(n, Vector{Int32}, a, shared = true)
 
     # Splits file
     s = open("$(prefix)_s.bin")
     a = read(s, Int)
-    splits = Mmap.mmap(s, Vector{Float64}, a)
+    splits = Mmap.mmap(s, Vector{Float64}, a, shared = true)
 
     # Dims file
     d = open("$(prefix)_d.bin")
     a = read(d, Int)
     b = read(d, Int)
-    dims = Mmap.mmap(d, BitArray, (a,b))
+    dims = Mmap.mmap(d, BitArray, (a,b), shared = true)
 
     # Leaf_data file
     l = open("$(prefix)_l.bin")
     a = read(l, Int)
     b = read(l, Int)
     leaf_index = convert(Int32, b + 1)
-    leaf_data = Mmap.mmap(l, BitArray, (a,b))
+    leaf_data = Mmap.mmap(l, BitArray, (a,b), shared = true)
 
     if isfile("$(prefix)_q.bin")
         # Qvals file
         q = open("$(prefix)_q.bin")
         a = read(q, Int)
         b = read(q, Int)
-        qvals = Mmap.mmap(q, Matrix{Float64}, (a,b))
+        qvals = Mmap.mmap(q, Matrix{Float64}, (a,b), shared = true)
         return TREEARRAY(nodes, splits, dims, leaf_data, qvals, node_index, leaf_index)
     end
 
@@ -232,7 +455,6 @@ function write_to_files_and_truncate(ta::TREEARRAY, prefix)
     close(q)
 end
 
-
 # TRAVERSAL AND EVALUATION
 
 function get_bounds_and_cats(ta::TREEARRAY)
@@ -289,7 +511,7 @@ function get_bounds_and_cats(ta::TREEARRAY)
 end
 
 # Will return positive indices of the corresponding leaf data
-function get_overlapping_nodes(ta::TREEARRAY, lbs, ubs)
+function get_overlapping_nodes(ta::Union{TREEARRAY, SHARED_TREEARRAY}, lbs, ubs)
     nodes = ta.nodes
     splits = ta.splits
     dims = ta.dims
@@ -326,7 +548,7 @@ function get_overlapping_nodes(ta::TREEARRAY, lbs, ubs)
     return overlapping_node_data_inds
 end
 
-function get_qvals(ta::TREEARRAY, point)
+function get_qvals(ta::Union{TREEARRAY, SHARED_TREEARRAY}, point)
     curr = 1 # root of tree
     while ta.nodes[curr] > 0 # not at leaf
         split = ta.splits[curr]
@@ -337,6 +559,7 @@ function get_qvals(ta::TREEARRAY, point)
     end
     return ta.qvals[:, -ta.nodes[curr]]
 end
+
 
 """
 KDTrees
