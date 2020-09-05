@@ -270,7 +270,7 @@ function update_leaf!(ta::Union{TREEARRAY, SHARED_TREEARRAY}, updated_tas, pra, 
             end
 
             # Check if need to split due to actions
-            qval_diff = maximum(qvals[:,-nodes[curr]]) - minimum(qvals[:,-nodes[curr]])
+            qval_diff = maximum(qvals[cats .+ 1, -nodes[curr]]) - minimum(qvals[cats .+ 1, -nodes[curr]])
             split_h = (qval_diff > qthreshold) && (curr_ubs[1] - curr_lbs[1] > 10 / 16000)
             split_ḣ₀ = (qval_diff > qthreshold) && (curr_ubs[2] - curr_lbs[2] > 1 / 200)
             split_ḣ₁ = (qval_diff > qthreshold) && (curr_ubs[3] - curr_lbs[3] > 1 / 200)
@@ -368,6 +368,64 @@ function update_leaf!(ta::Union{TREEARRAY, SHARED_TREEARRAY}, updated_tas, pra, 
 end
 
 function split_and_reverify!(ta::Union{TREEARRAY, SHARED_TREEARRAY}, curr, lbs, ubs, s, lb_s, ub_s, pra, τ, dim;
+    prefix = "/scratch/smkatz/VerticalCAS/networks/bugfix_pra0")
+    
+    cats = findall(ta.leaf_data[:, -ta.nodes[curr]]) .- 1 # subtract 1 because index at 1
+
+    left_cats = cats
+    right_cats = cats
+
+    split = (lbs[dim] + ubs[dim]) ./ 2
+
+    # Go left, upper bounds will change
+    left_ubs = copy(ubs)
+    left_ubs[dim] = split
+    # Go right, lower bounds will change
+    right_lbs = copy(lbs)
+    right_lbs[dim] = split
+
+    # Get categories for new leaves
+    if length(cats) > 1
+        left_cats = get_categories!(cats, lbs, left_ubs, pra, τ, prefix = prefix)
+        if length(left_cats) == 0
+            left_cats = get_categories!(actions, lbs, left_ubs, pra, τ, prefix = prefix)
+        end
+
+        right_cats = get_categories!(cats, right_lbs, ubs, pra, τ, prefix = prefix)
+        if length(right_cats) == 0
+            right_cats = get_categories!(actions, right_lbs, ubs, pra, τ, prefix = prefix)
+        end
+    end
+
+    # Split the node
+
+    # Reset values for curr node
+    ta.splits[curr] = split
+    ta.dims[dim, curr] = true
+    ta.nodes[curr] = ta.node_index
+
+    # Set values for leaf nodes
+    ta.nodes[ta.node_index] = -ta.leaf_index
+    ta.nodes[ta.node_index + 1] = -(ta.leaf_index + 1)
+
+    ta.leaf_data[left_cats .+ 1, ta.leaf_index] .= true # +1 because index at 1
+    ta.leaf_data[right_cats .+ 1, ta.leaf_index + 1] .= true # +1 because index at 1
+
+    # Add everything to the stack
+    push!(s, ta.node_index)
+    push!(lb_s, lbs)
+    push!(ub_s, left_ubs)
+
+    push!(s, ta.node_index + 1)
+    push!(lb_s, right_lbs)
+    push!(ub_s, ubs)
+
+    # Update indices
+    ta.node_index += 2
+    ta.leaf_index += 2
+end
+
+function split!(ta::Union{TREEARRAY, SHARED_TREEARRAY}, curr, lbs, ubs, s, lb_s, ub_s, pra, τ, dim;
     prefix = "/scratch/smkatz/VerticalCAS/networks/bugfix_pra0")
     
     cats = findall(ta.leaf_data[:, -ta.nodes[curr]]) .- 1 # subtract 1 because index at 1

@@ -163,7 +163,7 @@ function check_and_split_stas(stas; post = "/scratch/smkatz/post2dshared/", qthr
     for pra in actions
         sta = stas[(pra, 0.0)]
         post_prefix = "$(post)pra$(pra+1)tau0"
-        updated_stas[(pra, 0.0)] = shared_treearray_copy(sta, post_prefix)
+        updated_stas[(pra, 0.0)] = shared_treearray_copy_and_extend(sta, 800000, post_prefix)
     end
 
     @sync @distributed for pra in actions

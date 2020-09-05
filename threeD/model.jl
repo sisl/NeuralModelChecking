@@ -67,7 +67,7 @@ function transition_ta(ta::Union{TREEARRAY, SHARED_TREEARRAY}, lbs, ubs, pra)
             vals = [maximum(ta.qvals[:, overlapping_data_inds[i]]) for i = 1:length(overlapping_data_inds)]
 
             push!(worst_vals, maximum(vals))
-            push!(worst_probs, ownProbs[i](intProbs[j]))
+            push!(worst_probs, ownProbs[i]*intProbs[j])
 
             range = maximum(vals) - minimum(vals)
             max_range = range > max_range ? range : max_range
@@ -106,7 +106,7 @@ function dynamics(lbs, ubs, ḧ₀, ḧ₁, a)
     min_next_h = min_h - max_ḣ₀ - 0.5*ḧ₀ + min_ḣ₁
     max_next_h = max_h - min_ḣ₀ - 0.5*ḧ₀ + max_ḣ₁
 
-    min_point = normalize_point_3d([min_next_h, min_next_ḣ₀])
-    max_point = normalize_point_3d([max_next_h, max_next_ḣ₀])
+    min_point = normalize_point_3d([min_next_h, min_next_ḣ₀, min_next_ḣ₁])
+    max_point = normalize_point_3d([max_next_h, max_next_ḣ₀, max_next_ḣ₁])
     return min_point, max_point
 end

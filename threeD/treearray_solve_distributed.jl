@@ -20,7 +20,7 @@ function check_stas(stas; post = "/scratch/smkatz/post3dshared/")
         for pra in actions
             sta = stas[(pra, τ)]
             post_prefix = "$(post)pra$(pra+1)tau$(τint)"
-            updated_stas[(pra, τ)] = shared_treearray_copy_and_extend(sta, 40000, post_prefix)
+            updated_stas[(pra, τ)] = shared_treearray_copy_and_extend(sta, 80000, post_prefix)
         end
 
         @sync @distributed for pra in actions
@@ -153,7 +153,7 @@ function update_distrib(updated_sta::SHARED_TREEARRAY, updated_stas, pra, τ)
     return updated_sta
 end
 
-function check_and_split_stas(stas; post = "/scratch/smkatz/post2dshared/", qthreshold = 0.5, threshold = 0.9,
+function check_and_split_stas(stas; post = "/scratch/smkatz/post3dshared/", qthreshold = 0.5, threshold = 0.9,
     prefix = "/scratch/smkatz/VerticalCAS/networks/bugfix_pra0")
 
     updated_stas = Dict()
@@ -170,7 +170,7 @@ function check_and_split_stas(stas; post = "/scratch/smkatz/post2dshared/", qthr
         label_collisions_distrib(updated_stas[(pra, 0.0)])
     end
     
-    for τ = 1:40
+    for τ = 1:1
         println("τ: $τ")
         start = time()
 
@@ -179,7 +179,7 @@ function check_and_split_stas(stas; post = "/scratch/smkatz/post2dshared/", qthr
         for pra in actions
             sta = stas[(pra, τ)]
             post_prefix = "$(post)pra$(pra+1)tau$(τint)"
-            updated_stas[(pra, τ)] = shared_treearray_copy_and_extend(sta, 800000, post_prefix)
+            updated_stas[(pra, τ)] = shared_treearray_copy_and_extend(sta, 1000000, post_prefix)
         end
 
         @sync @distributed for pra in actions
