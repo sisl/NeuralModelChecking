@@ -1,4 +1,4 @@
-function check_stas(stas; post = "/scratch/smkatz/post2dshared/")
+function check_stas(stas; post = "/scratch/smkatz/post3dshared/")
     updated_stas = Dict()
     tas_rc = Dict()
     # Do the tau = 0 trees for each pra
@@ -48,8 +48,8 @@ function label_collisions_distrib(updated_sta::SHARED_TREEARRAY)
     ub_s = Stack{Vector{Float64}}()
     s = Stack{Int32}()
 
-    push!(lb_s, [-0.5, -0.5])
-    push!(ub_s, [0.5, 0.5])
+    push!(lb_s, [-0.5, -0.5, -0.5])
+    push!(ub_s, [0.5, 0.5, 0.5])
     push!(s, 1)
 
     while !isempty(s)
@@ -109,8 +109,8 @@ function update_distrib(updated_sta::SHARED_TREEARRAY, updated_stas, pra, τ)
     ub_s = Stack{Vector{Float64}}()
     s = Stack{Int32}()
 
-    push!(lb_s, [-0.5, -0.5])
-    push!(ub_s, [0.5, 0.5])
+    push!(lb_s, [-0.5, -0.5, -0.5])
+    push!(ub_s, [0.5, 0.5, 0.5])
     push!(s, 1)
 
     while !isempty(s)
@@ -203,8 +203,8 @@ function update_or_split_distrib(updated_sta::SHARED_TREEARRAY, updated_stas, pr
     ub_s = Stack{Vector{Float64}}()
     s = Stack{Int32}()
 
-    push!(lb_s, [-0.5, -0.5])
-    push!(ub_s, [0.5, 0.5])
+    push!(lb_s, [-0.5, -0.5, -0.5])
+    push!(ub_s, [0.5, 0.5, 0.5])
     push!(s, 1)
 
     while !isempty(s)

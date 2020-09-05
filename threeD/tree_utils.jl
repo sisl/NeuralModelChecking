@@ -168,7 +168,7 @@ function shared_treearray(prefix)
     # Read everything into shared arrays
     nodes = SharedArray{Int32, 1}("$(prefix)_n.bin", (a,))
     splits = SharedArray{Float64, 1}("$(prefix)_s.bin", (a,))
-    dims = SharedArray{Bool, 2}("$(prefix)_d.bin", (2, a))
+    dims = SharedArray{Bool, 2}("$(prefix)_d.bin", (3, a))
     leaf_data = SharedArray{Bool, 2}("$(prefix)_l.bin", (9, b))
     if isfile("$(prefix)_q.bin")
         qvals = SharedArray{Float64, 2}("$(prefix)_q.bin", (9, b))
@@ -233,7 +233,7 @@ function shared_treearray_copy(sta::SHARED_TREEARRAY, post_prefix)
     nodes[:] = sta.nodes
     splits = SharedArray{Float64, 1}("$(post_prefix)_s.bin", (a,), mode="w+")
     splits[:] = sta.splits
-    dims = SharedArray{Bool, 2}("$(post_prefix)_d.bin", (2, a), mode="w+")
+    dims = SharedArray{Bool, 2}("$(post_prefix)_d.bin", (3, a), mode="w+")
     dims[:,:] = sta.dims
     leaf_data = SharedArray{Bool, 2}("$(post_prefix)_l.bin", (9, b), mode="w+")
     leaf_data[:,:] = sta.leaf_data
@@ -252,7 +252,7 @@ function shared_treearray_copy_and_extend(sta::SHARED_TREEARRAY, totsize, post_p
     nodes[1:a] = sta.nodes
     splits = SharedArray{Float64, 1}("$(post_prefix)_s.bin", (totsize,), mode="w+")
     splits[1:a] = sta.splits
-    dims = SharedArray{Bool, 2}("$(post_prefix)_d.bin", (2, totsize), mode="w+")
+    dims = SharedArray{Bool, 2}("$(post_prefix)_d.bin", (3, totsize), mode="w+")
     dims[:,1:a] = sta.dims
     leaf_data = SharedArray{Bool, 2}("$(post_prefix)_l.bin", (9, totsize), mode="w+")
     leaf_data[:,1:b] = sta.leaf_data
@@ -278,8 +278,8 @@ function get_bounds_and_cats(sta::SHARED_TREEARRAY)
     ub_s = Stack{Vector{Float64}}()
     s = Stack{Int32}()
 
-    push!(lb_s, [-0.5, -0.5])
-    push!(ub_s, [0.5, 0.5])
+    push!(lb_s, [-0.5, -0.5, -0.5])
+    push!(ub_s, [0.5, 0.5, 0.5])
     push!(s, 1)
 
     while !isempty(s)
@@ -927,4 +927,12 @@ end
 
 function normalize_point(point::Vector{Float64})
     return point ./ [16000.0, 200.0]
+end
+
+function unnormalize_point_3d(point::Vector{Float64})
+    return point .* [16000.0, 200.0, 200.0]
+end
+
+function normalize_point_3d(point::Vector{Float64})
+    return point ./ [16000.0, 200.0, 200.0]
 end
