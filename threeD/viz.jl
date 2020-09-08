@@ -10,6 +10,12 @@ ḣ₀s = vcat(LinRange(-100,-60,5),
            LinRange(35,50,4),
            LinRange(60,100,5))
 
+ḣ₁s = vcat(LinRange(-100,-60,5),
+           LinRange(-50,-35,4),
+           LinRange(-30,30,21),
+           LinRange(35,50,4),
+           LinRange(60,100,5))
+
 """
 Tree Arrays
 """
@@ -44,6 +50,64 @@ function plot_nadvs_3d(sta::SHARED_TREEARRAY, ḣ₁)
     end
 
     return ax
+end
+
+function viz_prob_3d(stas)
+    currSavePlot = 0
+    first_call = true
+
+    @manipulate for fileName in textbox(value="myFile.pdf",label="File Name") |> onchange,
+        savePlot in button("Save Plot"), 
+        vl in pad(0.3em, nothing),
+		refreshPlot in button("Refresh"),
+    	nbin = 100,
+        xmin = 0.0,
+        xmax = 40.0,
+        ymin = -2000.0,
+        ymax = 2000.0,
+        logprob = [true, false],
+        pra = collect(0:8),
+        ḣ₀ = ḣ₀s,
+        ḣ₁ = ḣ₁s
+
+        function get_heat(x, y)
+            npoint = normalize_point_3d([y, ḣ₀, ḣ₁])
+            τ = round(x)
+            sta = stas[(pra, τ)]
+            qvals = get_qvals(sta, npoint)
+            if logprob
+                return -log(maximum(qvals) + 1e-10)
+            else
+                return -maximum(qvals)
+            end
+        end
+
+        # 9 was xmax
+        ax = Axis([
+            Plots.Image(get_heat, (xmin, 9.0), (ymin, ymax),
+            xbins = nbin, ybins = nbin, colormap = pasteljet, colorbar=false),
+            ], xmin=xmin, xmax=xmax, ymin=ymin,ymax=ymax, width="10cm", height="8cm", 
+               xlabel="Tau (s)", ylabel="Relative Alt (ft)", title="Probabilities")
+
+        if savePlot > currSavePlot
+            # 9 was xmax
+        	ax2 = Axis([
+                Plots.Image(get_heat, (xmin, 9.0), (ymin, ymax),
+                xbins = nbin, ybins = nbin, colormap = pasteljet, colorbar=false),
+                ], xmin=xmin, xmax=xmax, ymin=ymin,ymax=ymax, width="10cm", height="8cm", 
+                   xlabel="Tau (s)", ylabel="Relative Alt (ft)", title="Probabilities")
+            PGFPlots.save(fileName, ax2, include_preamble=:false)
+            currSavePlot += 1
+        end
+
+        if first_call
+			first_call = false
+			PGFPlots.cleanup(ax)
+			return nothing
+		else
+			return ax
+		end
+    end
 end
 
 function viz_prob_shared(stas)

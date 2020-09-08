@@ -98,6 +98,68 @@ function create_files_for_sa(old_prefix, new_prefix)
     close(i)
 end
 
+# discretization number hard coded
+function process_tau0(old_prefix, new_prefix)
+    node_index = 1167103
+    leaf_index = 583552
+
+    n = open("$(old_prefix)_n.bin")
+    nodes = Mmap.mmap(n, Vector{Int32}, node_index)
+    close(n)
+
+    n_new = open("$(new_prefix)_n.bin", "w+")
+    write(n_new, nodes[1:node_index])
+
+    close(n)
+    close(n_new)
+
+    # Splits file
+    s = open("$(old_prefix)_s.bin")
+    splits = Mmap.mmap(s, Vector{Float64}, node_index)
+
+    s_new = open("$(new_prefix)_s.bin", "w+")
+    write(s_new, splits[1:node_index])
+
+    close(s)
+    close(s_new)
+
+    # Dims file
+    d = open("$(old_prefix)_d.bin")
+    dims = Mmap.mmap(d, Array{Bool, 2}, (3, node_index))
+
+    d_new = open("$(new_prefix)_d.bin", "w+")
+    write(d_new, dims[:, 1:node_index])
+
+    close(d)
+    close(d_new)
+
+    # Leaf_data file
+    l = open("$(old_prefix)_l.bin")
+    leaf_data = Mmap.mmap(l, Array{Bool, 2}, (9, leaf_index))
+
+    l_new = open("$(new_prefix)_l.bin", "w+")
+    write(l_new, leaf_data[:, 1:leaf_index])
+
+    close(l)
+    close(l_new)
+
+    # Qvals file
+    q = open("$(old_prefix)_q.bin")
+    qvals = Mmap.mmap(q, Array{Float64, 2}, (9, leaf_index))
+
+    q_new = open("$(new_prefix)_q.bin", "w+")
+    write(q_new, qvals[:, 1:leaf_index])
+
+    close(q)
+    close(q_new)
+
+    i = open("$(new_prefix)_i.bin", "w+")
+    write(i, node_index)
+    write(i, leaf_index)
+
+    close(i)
+end 
+
 function truncate_files(old_prefix, new_prefix, totsize)
     n = open("$(old_prefix)_n.bin")
     nodes = Mmap.mmap(n, Vector{Int32}, totsize)
@@ -123,7 +185,7 @@ function truncate_files(old_prefix, new_prefix, totsize)
 
     # Dims file
     d = open("$(old_prefix)_d.bin")
-    dims = Mmap.mmap(d, Array{Bool, 2}, (2, totsize))
+    dims = Mmap.mmap(d, Array{Bool, 2}, (3, totsize))
 
     d_new = open("$(new_prefix)_d.bin", "w+")
     write(d_new, dims[:, 1:node_index])
@@ -231,6 +293,18 @@ function shared_treearrays(filepath, a, b, taumax)
             τint = convert(Int64, τ)
             prefix = "$(filepath)pra$(pra)tau$(τint)"
             stas[(pra - 1, τ)] = shared_treearray(prefix, a, b)
+        end
+    end
+    return stas
+end
+
+function shared_treearrays(filepath, taumax)
+    stas = Dict()
+    for pra in 1:9
+        for τ = 0.0:taumax
+            τint = convert(Int64, τ)
+            prefix = "$(filepath)pra$(pra)tau$(τint)"
+            stas[(pra - 1, τ)] = shared_treearray(prefix)
         end
     end
     return stas

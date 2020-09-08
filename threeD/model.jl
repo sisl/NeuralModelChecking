@@ -85,8 +85,8 @@ function dynamics(lbs, ubs, ḧ₀, ḧ₁, a)
     max_h = true_ubs[1]
     min_ḣ₀ = true_lbs[2]
     max_ḣ₀ = true_ubs[2]
-    min_ḣ₁ = true_lbs[2]
-    max_ḣ₁ = true_ubs[2]
+    min_ḣ₁ = true_lbs[3]
+    max_ḣ₁ = true_ubs[3]
 
     vLow, vHigh = velRanges[a]
     if (vLow ≥ max_ḣ₀) .| (vHigh ≤ min_ḣ₀)
@@ -103,8 +103,8 @@ function dynamics(lbs, ubs, ḧ₀, ḧ₁, a)
     min_next_ḣ₁ = min_ḣ₁ + ḧ₁
     max_next_ḣ₁ = max_ḣ₁ + ḧ₁
 
-    min_next_h = min_h - max_ḣ₀ - 0.5*ḧ₀ + min_ḣ₁
-    max_next_h = max_h - min_ḣ₀ - 0.5*ḧ₀ + max_ḣ₁
+    min_next_h = min_h - max_ḣ₀ - 0.5*ḧ₀ + min_ḣ₁ + 0.5*ḧ₁
+    max_next_h = max_h - min_ḣ₀ - 0.5*ḧ₀ + max_ḣ₁ + 0.5*ḧ₁
 
     min_point = normalize_point_3d([min_next_h, min_next_ḣ₀, min_next_ḣ₁])
     max_point = normalize_point_3d([max_next_h, max_next_ḣ₀, max_next_ḣ₁])
