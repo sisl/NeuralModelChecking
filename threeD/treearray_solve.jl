@@ -260,9 +260,97 @@ function update_leaf!(ta::Union{TREEARRAY, SHARED_TREEARRAY}, updated_tas, pra, 
         next_ta = updated_tas[cats[i], τ - 1]
         max_range, vals, probs = transition_ta(next_ta, curr_lbs, curr_ubs, pra)
         
-        should_split = (max_range > threshold) && (curr_ubs[1] - curr_lbs[1] > 10 / 16000)
-        if should_split
+        #should_split = (max_range > threshold) && (curr_ubs[1] - curr_lbs[1] > 10 / 16000)
+
+        split_h = (max_range > threshold) && (curr_ubs[1] - curr_lbs[1] > 10 / 16000)
+        split_ḣ₀ = (max_range > threshold) && (curr_ubs[2] - curr_lbs[2] > 1 / 200)
+        split_ḣ₁ = (max_range > threshold) && (curr_ubs[3] - curr_lbs[3] > 1 / 200)
+
+        if split_h && split_ḣ₀ && split_ḣ₁
+            split!(ta, curr, curr_lbs, curr_ubs, s, lb_s, ub_s, pra, τ, 1, prefix = prefix)
+
+            right = pop!(s)
+            right_lbs = pop!(lb_s)
+            right_ubs = pop!(ub_s)
+
+            left = pop!(s)
+            left_lbs = pop!(lb_s)
+            left_ubs = pop!(ub_s)
+
+            split!(ta, left, left_lbs, left_ubs, s, lb_s, ub_s, pra, τ, 2, prefix = prefix)
+            split!(ta, right, right_lbs, right_ubs, s, lb_s, ub_s, pra, τ, 2, prefix = prefix)
+
+            right_right = pop!(s)
+            right_right_lbs = pop!(lb_s)
+            right_right_ubs = pop!(ub_s)
+
+            right_left = pop!(s)
+            right_left_lbs = pop!(lb_s)
+            right_left_ubs = pop!(ub_s)
+
+            left_right = pop!(s)
+            left_right_lbs = pop!(lb_s)
+            left_right_ubs = pop!(ub_s)
+
+            left_left = pop!(s)
+            left_left_lbs = pop!(lb_s)
+            left_left_ubs = pop!(ub_s)
+
+            split_and_reverify!(ta, left_left, left_left_lbs, left_left_ubs, s, lb_s, ub_s, pra, τ, 3, prefix = prefix)
+            split_and_reverify!(ta, left_right, left_right_lbs, left_right_ubs, s, lb_s, ub_s, pra, τ, 3, prefix = prefix)
+            split_and_reverify!(ta, right_left, right_left_lbs, right_left_ubs, s, lb_s, ub_s, pra, τ, 3, prefix = prefix)
+            split_and_reverify!(ta, right_right, right_right_lbs, right_right_ubs, s, lb_s, ub_s, pra, τ, 3, prefix = prefix)
+            break
+        elseif split_h && split_ḣ₀
+            split!(ta, curr, curr_lbs, curr_ubs, s, lb_s, ub_s, pra, τ, 1, prefix = prefix)
+
+            right = pop!(s)
+            right_lbs = pop!(lb_s)
+            right_ubs = pop!(ub_s)
+
+            left = pop!(s)
+            left_lbs = pop!(lb_s)
+            left_ubs = pop!(ub_s)
+
+            split_and_reverify!(ta, left, left_lbs, left_ubs, s, lb_s, ub_s, pra, τ, 2, prefix = prefix)
+            split_and_reverify!(ta, right, right_lbs, right_ubs, s, lb_s, ub_s, pra, τ, 2, prefix = prefix)
+            break
+        elseif split_h && split_ḣ₁
+            split!(ta, curr, curr_lbs, curr_ubs, s, lb_s, ub_s, pra, τ, 1, prefix = prefix)
+
+            right = pop!(s)
+            right_lbs = pop!(lb_s)
+            right_ubs = pop!(ub_s)
+
+            left = pop!(s)
+            left_lbs = pop!(lb_s)
+            left_ubs = pop!(ub_s)
+
+            split_and_reverify!(ta, left, left_lbs, left_ubs, s, lb_s, ub_s, pra, τ, 3, prefix = prefix)
+            split_and_reverify!(ta, right, right_lbs, right_ubs, s, lb_s, ub_s, pra, τ, 3, prefix = prefix)
+            break
+        elseif split_ḣ₀ && split_ḣ₁
+            split!(ta, curr, curr_lbs, curr_ubs, s, lb_s, ub_s, pra, τ, 2, prefix = prefix)
+
+            right = pop!(s)
+            right_lbs = pop!(lb_s)
+            right_ubs = pop!(ub_s)
+
+            left = pop!(s)
+            left_lbs = pop!(lb_s)
+            left_ubs = pop!(ub_s)
+
+            split_and_reverify!(ta, left, left_lbs, left_ubs, s, lb_s, ub_s, pra, τ, 3, prefix = prefix)
+            split_and_reverify!(ta, right, right_lbs, right_ubs, s, lb_s, ub_s, pra, τ, 3, prefix = prefix)
+            break
+        elseif split_h
             split_and_reverify!(ta, curr, curr_lbs, curr_ubs, s, lb_s, ub_s, pra, τ, 1, prefix = prefix)
+            break
+        elseif split_ḣ₀
+            split_and_reverify!(ta, curr, curr_lbs, curr_ubs, s, lb_s, ub_s, pra, τ, 2, prefix = prefix)
+            break
+        elseif split_ḣ₁
+            split_and_reverify!(ta, curr, curr_lbs, curr_ubs, s, lb_s, ub_s, pra, τ, 3, prefix = prefix)
             break
         else
             for j = 1:length(vals)
@@ -276,7 +364,7 @@ function update_leaf!(ta::Union{TREEARRAY, SHARED_TREEARRAY}, updated_tas, pra, 
             split_ḣ₁ = (qval_diff > qthreshold) && (curr_ubs[3] - curr_lbs[3] > 1 / 200)
 
             if split_h && split_ḣ₀ && split_ḣ₁
-                split_and_reverify!(ta, curr, curr_lbs, curr_ubs, s, lb_s, ub_s, pra, τ, 1, prefix = prefix)
+                split!(ta, curr, curr_lbs, curr_ubs, s, lb_s, ub_s, pra, τ, 1, prefix = prefix)
 
                 right = pop!(s)
                 right_lbs = pop!(lb_s)
@@ -286,8 +374,8 @@ function update_leaf!(ta::Union{TREEARRAY, SHARED_TREEARRAY}, updated_tas, pra, 
                 left_lbs = pop!(lb_s)
                 left_ubs = pop!(ub_s)
 
-                split_and_reverify!(ta, left, left_lbs, left_ubs, s, lb_s, ub_s, pra, τ, 2, prefix = prefix)
-                split_and_reverify!(ta, right, right_lbs, right_ubs, s, lb_s, ub_s, pra, τ, 2, prefix = prefix)
+                split!(ta, left, left_lbs, left_ubs, s, lb_s, ub_s, pra, τ, 2, prefix = prefix)
+                split!(ta, right, right_lbs, right_ubs, s, lb_s, ub_s, pra, τ, 2, prefix = prefix)
 
                 right_right = pop!(s)
                 right_right_lbs = pop!(lb_s)
@@ -311,7 +399,7 @@ function update_leaf!(ta::Union{TREEARRAY, SHARED_TREEARRAY}, updated_tas, pra, 
                 split_and_reverify!(ta, right_right, right_right_lbs, right_right_ubs, s, lb_s, ub_s, pra, τ, 3, prefix = prefix)
                 break
             elseif split_h && split_ḣ₀
-                split_and_reverify!(ta, curr, curr_lbs, curr_ubs, s, lb_s, ub_s, pra, τ, 1, prefix = prefix)
+                split!(ta, curr, curr_lbs, curr_ubs, s, lb_s, ub_s, pra, τ, 1, prefix = prefix)
 
                 right = pop!(s)
                 right_lbs = pop!(lb_s)
@@ -325,7 +413,7 @@ function update_leaf!(ta::Union{TREEARRAY, SHARED_TREEARRAY}, updated_tas, pra, 
                 split_and_reverify!(ta, right, right_lbs, right_ubs, s, lb_s, ub_s, pra, τ, 2, prefix = prefix)
                 break
             elseif split_h && split_ḣ₁
-                split_and_reverify!(ta, curr, curr_lbs, curr_ubs, s, lb_s, ub_s, pra, τ, 1, prefix = prefix)
+                split!(ta, curr, curr_lbs, curr_ubs, s, lb_s, ub_s, pra, τ, 1, prefix = prefix)
 
                 right = pop!(s)
                 right_lbs = pop!(lb_s)
@@ -339,7 +427,7 @@ function update_leaf!(ta::Union{TREEARRAY, SHARED_TREEARRAY}, updated_tas, pra, 
                 split_and_reverify!(ta, right, right_lbs, right_ubs, s, lb_s, ub_s, pra, τ, 3, prefix = prefix)
                 break
             elseif split_ḣ₀ && split_ḣ₁
-                split_and_reverify!(ta, curr, curr_lbs, curr_ubs, s, lb_s, ub_s, pra, τ, 2, prefix = prefix)
+                split!(ta, curr, curr_lbs, curr_ubs, s, lb_s, ub_s, pra, τ, 2, prefix = prefix)
 
                 right = pop!(s)
                 right_lbs = pop!(lb_s)

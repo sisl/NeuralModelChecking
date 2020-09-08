@@ -179,7 +179,34 @@ function check_and_split_stas(stas; post = "/scratch/smkatz/post3dshared/", qthr
         for pra in actions
             sta = stas[(pra, τ)]
             post_prefix = "$(post)pra$(pra+1)tau$(τint)"
-            updated_stas[(pra, τ)] = shared_treearray_copy_and_extend(sta, 1000000, post_prefix)
+            updated_stas[(pra, τ)] = shared_treearray_copy_and_extend(sta, 3000000, post_prefix)
+        end
+
+        @sync @distributed for pra in actions
+            update_or_split_distrib(updated_stas[(pra, τ)], updated_stas, pra, τ, 
+                        qthreshold = qthreshold, threshold = threshold, prefix = prefix)
+        end
+        println("Time required: $(time() - start)")
+    end
+
+    return updated_stas
+end
+
+function check_and_split_stas(stas, updated_stas, taumin, taumax; post = "/scratch/smkatz/post3dshared/", qthreshold = 0.5, threshold = 0.9,
+    prefix = "/scratch/smkatz/VerticalCAS/networks/bugfix_pra0")
+
+    tas_rc = Dict()
+    
+    for τ = taumin:taumax
+        println("τ: $τ")
+        start = time()
+
+        τint = convert(Int64, τ)
+        
+        for pra in actions
+            sta = stas[(pra, τ)]
+            post_prefix = "$(post)pra$(pra+1)tau$(τint)"
+            updated_stas[(pra, τ)] = shared_treearray_copy_and_extend(sta, 7000000, post_prefix)
         end
 
         @sync @distributed for pra in actions

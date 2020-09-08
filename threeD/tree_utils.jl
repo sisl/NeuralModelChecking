@@ -186,7 +186,7 @@ function shared_treearray(prefix, a, b)
     # Read everything into shared arrays
     nodes = SharedArray{Int32, 1}("$(prefix)_n.bin", (a,))
     splits = SharedArray{Float64, 1}("$(prefix)_s.bin", (a,))
-    dims = SharedArray{Bool, 2}("$(prefix)_d.bin", (2, a))
+    dims = SharedArray{Bool, 2}("$(prefix)_d.bin", (3, a))
     leaf_data = SharedArray{Bool, 2}("$(prefix)_l.bin", (9, b))
     if isfile("$(prefix)_q.bin")
         qvals = SharedArray{Float64, 2}("$(prefix)_q.bin", (9, b))
@@ -216,6 +216,30 @@ function shared_treearrays(filepath, a, b)
     stas = Dict()
     for pra in 1:9
         for τ = 0.0:40.0
+            τint = convert(Int64, τ)
+            prefix = "$(filepath)pra$(pra)tau$(τint)"
+            stas[(pra - 1, τ)] = shared_treearray(prefix, a, b)
+        end
+    end
+    return stas
+end
+
+function shared_treearrays(filepath, a, b, taumax)
+    stas = Dict()
+    for pra in 1:9
+        for τ = 0.0:taumax
+            τint = convert(Int64, τ)
+            prefix = "$(filepath)pra$(pra)tau$(τint)"
+            stas[(pra - 1, τ)] = shared_treearray(prefix, a, b)
+        end
+    end
+    return stas
+end
+
+function shared_treearrays(filepath, a, b, taumin, taumax)
+    stas = Dict()
+    for pra in 1:9
+        for τ = taumin:taumax
             τint = convert(Int64, τ)
             prefix = "$(filepath)pra$(pra)tau$(τint)"
             stas[(pra - 1, τ)] = shared_treearray(prefix, a, b)
