@@ -170,24 +170,24 @@ function check_and_split_stas(stas; post = "/scratch/smkatz/post3dshared/", qthr
         label_collisions_distrib(updated_stas[(pra, 0.0)])
     end
     
-    # for τ = 1:1
-    #     println("τ: $τ")
-    #     start = time()
+    for τ = 1:1
+        println("τ: $τ")
+        start = time()
 
-    #     τint = convert(Int64, τ)
+        τint = convert(Int64, τ)
         
-    #     for pra in actions
-    #         sta = stas[(pra, τ)]
-    #         post_prefix = "$(post)pra$(pra+1)tau$(τint)"
-    #         updated_stas[(pra, τ)] = shared_treearray_copy_and_extend(sta, 3000000, post_prefix)
-    #     end
+        for pra in actions
+            sta = stas[(pra, τ)]
+            post_prefix = "$(post)pra$(pra+1)tau$(τint)"
+            updated_stas[(pra, τ)] = shared_treearray_copy_and_extend(sta, 3000000, post_prefix)
+        end
 
-    #     @sync @distributed for pra in actions
-    #         update_or_split_distrib(updated_stas[(pra, τ)], updated_stas, pra, τ, 
-    #                     qthreshold = qthreshold, threshold = threshold, prefix = prefix)
-    #     end
-    #     println("Time required: $(time() - start)")
-    # end
+        @sync @distributed for pra in actions
+            update_or_split_distrib(updated_stas[(pra, τ)], updated_stas, pra, τ, 
+                        qthreshold = qthreshold, threshold = threshold, prefix = prefix)
+        end
+        println("Time required: $(time() - start)")
+    end
 
     return updated_stas
 end
@@ -206,7 +206,7 @@ function check_and_split_stas(stas, updated_stas, taumin, taumax; post = "/scrat
         for pra in actions
             sta = stas[(pra, τ)]
             post_prefix = "$(post)pra$(pra+1)tau$(τint)"
-            updated_stas[(pra, τ)] = shared_treearray_copy_and_extend(sta, 7000000, post_prefix)
+            updated_stas[(pra, τ)] = shared_treearray_copy_and_extend(sta, 20000000, post_prefix)
         end
 
         @sync @distributed for pra in actions
